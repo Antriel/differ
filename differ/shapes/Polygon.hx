@@ -104,9 +104,7 @@ class Polygon extends Shape {
 
         for(i in 0 ... sides) {
             angle = (i * rotation) + ((Math.PI - rotation) * 0.5);
-            vector = new Vector();
-            vector.x = Math.cos(angle) * radius;
-            vector.y = Math.sin(angle) * radius;
+			vector = new Vector(Math.cos(angle) * radius, Math.sin(angle) * radius);
             vertices.push(vector);
         }
 

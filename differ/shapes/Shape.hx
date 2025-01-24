@@ -92,11 +92,11 @@ class Shape {
 
 //.position
 
-    function get_position() : Vector {
+	inline function get_position():Vector {
         return _position;
     }
 
-    function set_position( v : Vector ) : Vector {
+	inline function set_position(v:Vector):Vector {
         _position = v;
         refresh_transform();
         return _position;
@@ -104,11 +104,11 @@ class Shape {
 
 //.x
 
-    function get_x() : Float {
+	inline function get_x():Float {
         return _position.x;
     }
 
-    function set_x(x : Float) : Float {
+	inline function set_x(x:Float):Float {
         _position.x = x;
         refresh_transform();
         return _position.x;

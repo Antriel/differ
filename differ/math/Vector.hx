@@ -13,16 +13,16 @@ import differ.math.Matrix;
 class Vector {
 
         /** The x component */
-    public var x  : Float = 0;
+	public var x:Float;
         /** The y component */
-    public var y  : Float = 0;
+	public var y:Float;
 
         /** The length of the vector */
     public var length ( get, set ) : Float;
         /** The length, squared, of the vector */
     public var lengthsq ( get, never ) : Float;
 
-    public function new( _x:Float = 0, _y:Float = 0 ) {
+	public inline function new(_x:Float, _y:Float) {
 
         x = _x;
         y = _y;
@@ -49,7 +49,7 @@ class Vector {
     } //transform
 
         /** Sets the vector's length to 1. Returns this vector, modified. */
-    public function normalize() : Vector {
+	public inline function normalize():Vector {
 
         if(length == 0){
             x = 1;
@@ -68,7 +68,7 @@ class Vector {
         /** Sets the length to fit under the given maximum value.
             Nothing is done if the vector is already shorter.
             Returns this vector, modified. */
-    public function truncate( max:Float ) : Vector {
+	public inline function truncate(max:Float):Vector {
 
         length = Math.min(max, length);
 
@@ -77,7 +77,7 @@ class Vector {
     } //truncate
 
         /** Invert this vector. Returns this vector, modified. */
-    public function invert() : Vector {
+	public inline function invert():Vector {
 
             x = -x;
             y = -y;
@@ -87,21 +87,21 @@ class Vector {
     } //invert
 
         /** Return the dot product of this vector and another vector. */
-    public function dot( other:Vector ) : Float {
+	public inline function dot(other:Vector):Float {
 
         return x * other.x + y * other.y;
 
     } //dot
 
         /** Return the cross product of this vector and another vector. */
-    public function cross( other:Vector ) : Float {
+	public inline function cross(other:Vector):Float {
 
         return x * other.y - y * other.x;
 
     } //cross
 
         /** Add a vector to this vector. Returns this vector, modified. */
-    public function add(other:Vector):Vector {
+	public inline function add(other:Vector):Vector {
 
             x += other.x;
             y += other.y;
@@ -111,7 +111,7 @@ class Vector {
     } //add
 
         /** Subtract a vector from this one. Returns this vector, modified. */
-    public function subtract( other:Vector ) : Vector {
+	public inline function subtract(other:Vector):Vector {
 
             x -= other.x;
             y -= other.y;
