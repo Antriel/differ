@@ -29,6 +29,20 @@ class Polygon extends Shape {
 
     } //new
 
+	public function testPoint(point:Vector):Bool {
+		final verts = transformedVertices;
+		var inside:Bool = false;
+		for (i in 0...verts.length) {
+			var j = (i + 1) % verts.length;
+			var pi = verts[i];
+			var pj = verts[j];
+			if (((pi.y > point.y) != (pj.y > point.y)) && (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)) {
+				inside = !inside;
+			}
+		}
+		return inside;
+	}
+
         /** Test for a collision with a shape. */
     override public function test( shape:Shape, ?into:ShapeCollision ) : ShapeCollision {
 
