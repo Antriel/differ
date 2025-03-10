@@ -116,3 +116,112 @@ private function distanceToEdgeSquared(point:Vector, p1:Vector, p2:Vector):Float
 
 	return pprodx * pprodx + pprody * pprody;
 }
+
+function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):SweptCollision {
+	var globalEntry:Float = 0;
+	var globalExit:Float = 1;
+
+	final vertsA = polygonA.transformedVertices;
+	final vertsB = polygonB.transformedVertices;
+
+	// Build a list of potential separating axes (normals to each edge) from both polygons.
+	var axes:Array<Vector> = [];
+
+	// Axes from polygonA.
+	for (i in 0...vertsA.length) {
+		var p1 = vertsA[i];
+		var p2 = vertsA[(i + 1) % vertsA.length];
+		var edge = p2.clone().subtract(p1);
+		// Compute the perpendicular (clockwise) and normalize.
+		var normal = new Vector(edge.y, -edge.x);
+		var length = normal.length;
+		if (length == 0)
+			continue;
+		normal.x /= length;
+		normal.y /= length;
+		axes.push(normal);
+	}
+
+	// Axes from polygonB.
+	for (i in 0...vertsB.length) {
+		var p1 = vertsB[i];
+		var p2 = vertsB[(i + 1) % vertsB.length];
+		var edge = p2.clone().subtract(p1);
+		var normal = new Vector(edge.y, -edge.x);
+		var length = normal.length;
+		if (length == 0)
+			continue;
+		normal.x /= length;
+		normal.y /= length;
+		axes.push(normal);
+	}
+
+	// For each axis, compute the projection intervals for both polygons and determine the time interval of overlap.
+	for (axis in axes) {
+		// Project polygonA onto the axis.
+		var aMin:Float = Math.POSITIVE_INFINITY;
+		var aMax:Float = Math.NEGATIVE_INFINITY;
+		for (vertex in vertsA) {
+			var proj = vertex.x * axis.x + vertex.y * axis.y;
+			if (proj < aMin)
+				aMin = proj;
+			if (proj > aMax)
+				aMax = proj;
+		}
+
+		// Project polygonB onto the axis.
+		var bMin:Float = Math.POSITIVE_INFINITY;
+		var bMax:Float = Math.NEGATIVE_INFINITY;
+		for (vertex in vertsB) {
+			var proj = vertex.x * axis.x + vertex.y * axis.y;
+			if (proj < bMin)
+				bMin = proj;
+			if (proj > bMax)
+				bMax = proj;
+		}
+
+		// Project the movement onto the axis.
+		var d = movement.x * axis.x + movement.y * axis.y;
+
+		// If there is no movement along this axis then the intervals must overlap initially.
+		if (d == 0) {
+			if (aMax < bMin || aMin > bMax)
+				return null; // They are separated on this axis.
+			else
+				continue; // They are overlapping on this axis at all times.
+		}
+
+		// Calculate the entry and exit times on this axis.
+		var t0 = (bMin - aMax) / d;
+		var t1 = (bMax - aMin) / d;
+
+		// Ensure t0 is the entry time and t1 the exit time.
+		if (t0 > t1) {
+			var tmp = t0;
+			t0 = t1;
+			t1 = tmp;
+		}
+
+		// Update the global collision interval.
+		if (t0 > globalEntry)
+			globalEntry = t0;
+		if (t1 < globalExit)
+			globalExit = t1;
+
+		// If the intervals do not overlap, no collision occurs.
+		if (globalEntry > globalExit)
+			return null;
+	}
+
+	// If the collision has already occurred, clamp time to 0.
+	if (globalEntry < 0)
+		globalEntry = 0;
+
+	// If the earliest collision is after the movement is complete, there is no collision.
+	if (globalEntry > 1)
+		return null;
+
+	var collision = new SweptCollision();
+	collision.time = globalEntry;
+	return collision;
+}
