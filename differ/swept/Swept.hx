@@ -10,16 +10,13 @@ function circleToPolygon(circle:Circle, polygon:Polygon, movement:Vector):SweptC
 	final radius = circle.transformedRadius;
 	final radiusSq = radius * radius;
 	// Check initial collision.
-	var initialMinDistSq:Float = Math.POSITIVE_INFINITY;
 	for (i => p in verts) {
 		final dist = distanceToEdgeSquared(circle.position, p, verts[(i + 1) % verts.length]);
-		if (dist < initialMinDistSq)
-			initialMinDistSq = dist;
-	}
-
-	if (initialMinDistSq <= radiusSq) {
-		final res = new SweptCollision();
-		res.time = 0;
+		if (dist < radiusSq) {
+			final res = new SweptCollision();
+			res.time = 0;
+			return res;
+		}
 	}
 
 	var earliestT:Float = Math.POSITIVE_INFINITY;
@@ -64,28 +61,27 @@ function circleToPolygon(circle:Circle, polygon:Polygon, movement:Vector):SweptC
 	}
 
 	// Check vertices.
-	for (vertex in verts) {
-		var a = movement.x * movement.x + movement.y * movement.y;
-		if (a == 0)
-			continue;
+	var a = movement.x * movement.x + movement.y * movement.y;
+	if (a != 0) {
+		for (vertex in verts) {
+			final dx = circle.position.x - vertex.x;
+			final dy = circle.position.y - vertex.y;
+			var b = 2 * (movement.x * dx + movement.y * dy);
+			var c = dx * dx + dy * dy - radiusSq;
 
-		final dx = circle.position.x - vertex.x;
-		final dy = circle.position.y - vertex.y;
-		var b = 2 * (movement.x * dx + movement.y * dy);
-		var c = dx * dx + dy * dy - radiusSq;
+			var discriminant = b * b - 4 * a * c;
+			if (discriminant < 0)
+				continue;
 
-		var discriminant = b * b - 4 * a * c;
-		if (discriminant < 0)
-			continue;
+			var sqrtD = Math.sqrt(discriminant);
+			var t1 = (-b - sqrtD) / (2 * a);
+			var t2 = (-b + sqrtD) / (2 * a);
 
-		var sqrtD = Math.sqrt(discriminant);
-		var t1 = (-b - sqrtD) / (2 * a);
-		var t2 = (-b + sqrtD) / (2 * a);
-
-		if (t1 >= 0 && t1 <= 1 && t1 < earliestT)
-			earliestT = t1;
-		if (t2 >= 0 && t2 <= 1 && t2 < earliestT)
-			earliestT = t2;
+			if (t1 >= 0 && t1 <= 1 && t1 < earliestT)
+				earliestT = t1;
+			if (t2 >= 0 && t2 <= 1 && t2 < earliestT)
+				earliestT = t2;
+		}
 	}
 
 	if (earliestT > 1)
