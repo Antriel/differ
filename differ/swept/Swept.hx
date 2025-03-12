@@ -118,45 +118,46 @@ private function distanceToEdgeSquared(point:Vector, p1:Vector, p2:Vector):Float
 }
 
 function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):SweptCollision {
-	var globalEntry:Float = 0;
-	var globalExit:Float = 1;
-
 	final vertsA = polygonA.transformedVertices;
 	final vertsB = polygonB.transformedVertices;
 
-	// Build a list of potential separating axes (normals to each edge) from both polygons.
+	// Build candidate axes from both polygons (using the outward normals of each edge).
 	var axes:Array<Vector> = [];
-
-	// Axes from polygonA.
 	for (i in 0...vertsA.length) {
 		var p1 = vertsA[i];
 		var p2 = vertsA[(i + 1) % vertsA.length];
 		var edge = p2.clone().subtract(p1);
-		// Compute the perpendicular (clockwise) and normalize.
-		var normal = new Vector(edge.y, -edge.x);
-		var length = normal.length;
-		if (length == 0)
+		if (edge.length == 0)
 			continue;
-		normal.x /= length;
-		normal.y /= length;
+		var normal = new Vector(edge.y, -edge.x);
+		var len = normal.length;
+		if (len == 0)
+			continue;
+		normal.x /= len;
+		normal.y /= len;
 		axes.push(normal);
 	}
-
-	// Axes from polygonB.
 	for (i in 0...vertsB.length) {
 		var p1 = vertsB[i];
 		var p2 = vertsB[(i + 1) % vertsB.length];
 		var edge = p2.clone().subtract(p1);
-		var normal = new Vector(edge.y, -edge.x);
-		var length = normal.length;
-		if (length == 0)
+		if (edge.length == 0)
 			continue;
-		normal.x /= length;
-		normal.y /= length;
+		var normal = new Vector(edge.y, -edge.x);
+		var len = normal.length;
+		if (len == 0)
+			continue;
+		normal.x /= len;
+		normal.y /= len;
 		axes.push(normal);
 	}
 
-	// For each axis, compute the projection intervals for both polygons and determine the time interval of overlap.
+	// Swept collision phase.
+	// Initialize globalEntry to a very small value so that if any t0 > this value, we update.
+	var globalEntry:Float = -1e-6;
+	var globalExit:Float = 1.0;
+	var sweptNormal:Vector = null;
+
 	for (axis in axes) {
 		// Project polygonA onto the axis.
 		var aMin:Float = Math.POSITIVE_INFINITY;
@@ -168,7 +169,6 @@ function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):S
 			if (proj > aMax)
 				aMax = proj;
 		}
-
 		// Project polygonB onto the axis.
 		var bMin:Float = Math.POSITIVE_INFINITY;
 		var bMax:Float = Math.NEGATIVE_INFINITY;
@@ -183,15 +183,15 @@ function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):S
 		// Project the movement onto the axis.
 		var d = movement.x * axis.x + movement.y * axis.y;
 
-		// If there is no movement along this axis then the intervals must overlap initially.
+		// If there is no movement along this axis, the intervals must be overlapping.
 		if (d == 0) {
 			if (aMax < bMin || aMin > bMax)
 				return null; // They are separated on this axis.
 			else
-				continue; // They are overlapping on this axis at all times.
+				continue;
 		}
 
-		// Calculate the entry and exit times on this axis.
+		// Compute entry and exit times along this axis.
 		var t0 = (bMin - aMax) / d;
 		var t1 = (bMax - aMin) / d;
 
@@ -202,9 +202,12 @@ function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):S
 			t1 = tmp;
 		}
 
-		// Update the global collision interval.
-		if (t0 > globalEntry)
+		if (t0 > globalEntry) {
 			globalEntry = t0;
+			// Choose the collision normal based on movement direction along the axis.
+			// (Ensure it points from polygonB toward polygonA.)
+			sweptNormal = (d < 0) ? axis : new Vector(-axis.x, -axis.y);
+		}
 		if (t1 < globalExit)
 			globalExit = t1;
 
@@ -213,15 +216,85 @@ function polygonToPolygon(polygonA:Polygon, polygonB:Polygon, movement:Vector):S
 			return null;
 	}
 
-	// If the collision has already occurred, clamp time to 0.
-	if (globalEntry < 0)
-		globalEntry = 0;
-
-	// If the earliest collision is after the movement is complete, there is no collision.
+	// If the collision occurs after the movement completes, there's no collision.
 	if (globalEntry > 1)
 		return null;
 
+	// If the collision happens in the future, use the swept collision result.
+	if (globalEntry > 0) {
+		var collision = new SweptCollision();
+		collision.time = globalEntry;
+		collision.normal = sweptNormal;
+		collision.overlap = 0;
+		return collision;
+	}
+
+	// Else, globalEntry is 0 (or negative, meaning initial overlap or just touching).
+	// Now perform a static SAT test to compute the Minimum Translation Vector (MTV).
+	var minOverlap:Float = Math.POSITIVE_INFINITY;
+	var mtvAxis:Vector = null;
+	for (axis in axes) {
+		// Project polygonA on axis.
+		var aMin:Float = Math.POSITIVE_INFINITY;
+		var aMax:Float = Math.NEGATIVE_INFINITY;
+		for (vertex in vertsA) {
+			var proj = vertex.x * axis.x + vertex.y * axis.y;
+			if (proj < aMin)
+				aMin = proj;
+			if (proj > aMax)
+				aMax = proj;
+		}
+		// Project polygonB on axis.
+		var bMin:Float = Math.POSITIVE_INFINITY;
+		var bMax:Float = Math.NEGATIVE_INFINITY;
+		for (vertex in vertsB) {
+			var proj = vertex.x * axis.x + vertex.y * axis.y;
+			if (proj < bMin)
+				bMin = proj;
+			if (proj > bMax)
+				bMax = proj;
+		}
+		// Compute overlap along this axis.
+		var overlap = Math.min(aMax, bMax) - Math.max(aMin, bMin);
+		if (overlap < minOverlap) {
+			minOverlap = overlap;
+			mtvAxis = axis;
+		}
+	}
+
+	if (mtvAxis == null)
+		return null;
+
+	var centerA = new Vector(0, 0); // TODO this could be lazy-cached on the polygon.
+	for (vertex in vertsA) {
+		centerA.x += vertex.x;
+		centerA.y += vertex.y;
+	}
+	centerA.x /= vertsA.length;
+	centerA.y /= vertsA.length;
+
+	var centerB = new Vector(0, 0);
+	for (vertex in vertsB) {
+		centerB.x += vertex.x;
+		centerB.y += vertex.y;
+	}
+	centerB.x /= vertsB.length;
+	centerB.y /= vertsB.length;
+
+	// Vector from centerB to centerA.
+	var fromBToA = new Vector(centerA.x - centerB.x, centerA.y - centerB.y);
+
+	// Ensure mtvAxis is pointing from B to A.
+	var dotProduct = mtvAxis.x * fromBToA.x + mtvAxis.y * fromBToA.y;
+	if (dotProduct < 0) {
+		// Flip the direction if it's pointing the wrong way.
+		mtvAxis.x = -mtvAxis.x;
+		mtvAxis.y = -mtvAxis.y;
+	}
+
 	var collision = new SweptCollision();
-	collision.time = globalEntry;
+	collision.time = 0;
+	collision.normal = mtvAxis;
+	collision.overlap = minOverlap;
 	return collision;
 }
